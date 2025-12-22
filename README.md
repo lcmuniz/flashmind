@@ -1,16 +1,87 @@
-# React + Vite
+# FlashMind 🧠
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+FlashMind é uma aplicação web de Repetição Espaçada (Spaced Repetition) que utiliza o algoritmo SM-2 para otimizar o aprendizado e a memorização. Construído com **React** no frontend e **Node.js/Express + PostgreSQL** no backend.
 
-Currently, two official plugins are available:
+## 🚀 Tecnologias
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend**: React, Vite, TailwindCSS, Lucide React.
+- **Backend**: Node.js, Express.
+- **Banco de Dados**: PostgreSQL.
+- **Autenticação**: JWT (JSON Web Tokens).
 
-## React Compiler
+## ⚙️ Pré-requisitos
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js (v18+)
+- PostgreSQL instalado e rodando.
 
-## Expanding the ESLint configuration
+## 🛠️ Instalação e Configuração
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+1. **Clone o repositório**
+   ```bash
+   git clone <url-do-repositorio>
+   cd flashmind
+   ```
+
+2. **Instale as dependências**
+   ```bash
+   npm install
+   ```
+   Isso instalará as dependências tanto do frontend quanto do backend.
+
+3. **Configure as Variáveis de Ambiente**
+   Crie um arquivo `.env` na raiz do projeto (baseado no `.env.example`):
+   ```env
+   DATABASE_URL=postgres://usuario:senha@localhost:5432/flashmind
+   JWT_SECRET=sua_chave_secreta_aqui
+   PORT=3000
+   ```
+   *Certifique-se de criar o banco de dados `flashmind` no seu PostgreSQL antes de prosseguir (ou aponte para um banco existente).*
+
+4. **Inicialize o Banco de Dados**
+   Execute o script para criar o schema (`flashmind`) e as tabelas necessárias:
+   ```bash
+   npm run db:init
+   ```
+
+## ▶️ Como Rodar
+
+A aplicação requer que o servidor (backend) e o cliente (frontend) rodem simultaneamente.
+
+1. **Inicie o Backend** (Terminal 1)
+   ```bash
+   npm run server
+   ```
+   O servidor rodará em `http://localhost:3000`.
+
+2. **Inicie o Frontend** (Terminal 2)
+   ```bash
+   npm run dev
+   ```
+   O app estará acessível em `http://localhost:5173`.
+
+## ✨ Funcionalidades
+
+### 📚 Gerenciamento de Decks e Cartões
+- Crie baralhos e adicione cartões (Pergunta/Resposta).
+- Suporte a mídia (Imagens/Vídeos via URL).
+- **Importar/Exportar**: Faça backup ou adicione cartões em lote via texto.
+  - Formato de Importação:
+    ```text
+    Deck: Nome do Baralho
+    P: Pergunta
+    R: Resposta
+    ---
+    ```
+
+### 🧠 Sistema de Estudo (SM-2)
+- O algoritmo agenda revisões baseadas no seu desempenho (Errei, Difícil, Bom, Fácil).
+- Cartões "Novos" -> "Aprendendo" -> "Revisão".
+
+### ⌨️ Atalhos de Teclado
+- **Baralho**:
+  - `E`: Iniciar Estudo ("Estudar Agora").
+  - `ESC`: Fechar modal de "Novo Cartão".
+- **Sessão de Estudo**:
+  - `Enter`: Revelar resposta.
+  - `E`, `D`, `B`, `F`: Avaliar (Errei, Difícil, Bom, Fácil).
+  - `ESC` ou `V`: Voltar ao painel.
