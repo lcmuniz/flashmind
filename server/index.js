@@ -178,7 +178,7 @@ app.post('/api/cards', authenticateToken, async (req, res) => {
 });
 
 app.put('/api/cards/:id', authenticateToken, async (req, res) => {
-    const { state, learningStepIndex, interval, ease_factor, repetitions, nextReviewDate } = req.body;
+    const { state, learningStepIndex, interval, ease_factor, repetitions, nextReviewDate, front, back, mediaType, mediaUrl } = req.body;
     const cardId = req.params.id;
 
     // Verifica owner via JOIN
@@ -191,13 +191,46 @@ app.put('/api/cards/:id', authenticateToken, async (req, res) => {
     }
 
     try {
+        // Prepare dynamic update
+        // If it's a review update, state etc will be present.
+        // If it's a content update, front/back will be present.
+        // We can just update everything that is passed, or use COALESCE in SQL.
+        // Simplified approach: Update all fields, relying on frontend to pass existing values if not changing,
+        // OR construct query dynamically.
+        // Since we have a fixed set of fields, let's just make the query flexible or assume full object is passed (safest for now to expect full object or use COALESCE).
+        // Let's use COALESCE to allow partial updates.
+
         const result = await query(
             `UPDATE flashmind.cards SET 
-         state = $1, learning_step_index = $2, interval_days = $3, ease_factor = $4, repetitions = $5, next_review_date = $6
-       WHERE id = $7 RETURNING *`,
-            [state, learningStepIndex, interval, ease_factor, repetitions, nextReviewDate, cardId]
+         state = COALESCE($1, state), 
+         learning_step_index = COALESCE($2, learning_step_index), 
+         interval_days = COALESCE($3, interval_days), 
+         ease_factor = COALESCE($4, ease_factor), 
+         repetitions = COALESCE($5, repetitions), 
+         next_review_date = COALESCE($6, next_review_date),
+         front = COALESCE($7, front),
+         back = COALESCE($8, back),
+         media_type = COALESCE($9, media_type),
+         media_url = COALESCE($10, media_url)
+       WHERE id = $11 RETURNING *`,
+            [state, learningStepIndex, interval, ease_factor, repetitions, nextReviewDate, front, back, mediaType, mediaUrl, cardId]
         );
-        res.json(result.rows[0]);
+
+        // Mapeia snake_case para camelCase para retorno
+        const row = result.rows[0];
+        res.json({
+            id: row.id,
+            front: row.front,
+            back: row.back,
+            mediaType: row.media_type,
+            mediaUrl: row.media_url,
+            state: row.state,
+            learningStepIndex: row.learning_step_index,
+            interval: row.interval_days,
+            ease_factor: row.ease_factor,
+            repetitions: row.repetitions,
+            nextReviewDate: row.next_review_date
+        });
     } catch (err) {
         console.error(err);
         res.status(500).send("Erro");

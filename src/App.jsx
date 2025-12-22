@@ -185,6 +185,15 @@ export default function App() {
           onBack={() => setView('dashboard')}
           onStudy={() => setView('study')}
           onAddCard={(f, b, t, u) => addCardToDeck(currentDeckId, f, b, t, u)}
+          onEditCard={async (id, f, b, t, u) => {
+            const card = cards.find(c => c.id === id);
+            if (!card) return;
+            const updated = { ...card, front: f, back: b, mediaType: t, mediaUrl: u };
+            try {
+              await api.cards.update(id, { front: f, back: b, mediaType: t, mediaUrl: u }); // Send only fields to update? API now handles partials via COALESCE
+              setCards(prev => prev.map(c => c.id === id ? updated : c));
+            } catch (e) { console.error(e); }
+          }}
           onDeleteCard={async (id) => {
             await api.cards.delete(id);
             setCards(prev => prev.filter(c => c.id !== id));
