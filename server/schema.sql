@@ -29,3 +29,6 @@ CREATE TABLE IF NOT EXISTS flashmind.cards (
   next_review_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- E-mails are compared case-insensitively at login.
+CREATE UNIQUE INDEX IF NOT EXISTS users_email_lower_idx ON flashmind.users (lower(email));
