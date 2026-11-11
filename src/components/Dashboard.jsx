@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { User, LogOut, Plus, Layers, Trash2, Play, BookOpen, FileUp, FileDown } from 'lucide-react';
 import { api } from '../lib/api';
+import { formatDecks, parseDecks } from '../lib/deckText';
 
 export default function Dashboard({ decks, user, onLogout, onCreateDeck, onSelectDeck, onDeleteDeck }) {
     const [showModal, setShowModal] = useState(false);
@@ -12,37 +13,15 @@ export default function Dashboard({ decks, user, onLogout, onCreateDeck, onSelec
     const handleExportAll = async () => {
         setIsProcessing(true);
         try {
-            let exportStr = "";
+            const withCards = [];
             for (const deck of decks) {
-                exportStr += `Deck: ${deck.name}\n`;
-                const cards = await api.cards.list(deck.id);
-                cards.forEach(card => {
-                    exportStr += `P: ${card.front}\nAlso: ${card.back}\n`; // Fixing typo in user request "Also: " was not requested, user said "R: ". Wait, user request: "R: resposta". ok.
-                });
-                exportStr += `---\n`;
+                withCards.push({ name: deck.name, cards: await api.cards.list(deck.id) });
             }
-            // Wait, I need to match user request EXACTLY.
-            // Request:
-            // Deck: nome do deck 1
-            // P: pergunta 1
-            // R: resposta1
-            // ...
-
-            let finalExportStr = "";
-            for (const deck of decks) {
-                finalExportStr += `Deck: ${deck.name}\n`;
-                const cards = await api.cards.list(deck.id);
-                cards.forEach(card => {
-                    finalExportStr += `P: ${card.front}\nR: ${card.back}\n`;
-                });
-                finalExportStr += `---\n`;
-            }
-
-            const blob = new Blob([finalExportStr], { type: 'text/plain' });
+            const blob = new Blob([formatDecks(withCards)], { type: 'text/plain' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `flashmind_backup.txt`;
+            a.download = 'flashmind_backup.txt';
             a.click();
             URL.revokeObjectURL(url);
         } catch (err) { console.error(err); } finally { setIsProcessing(false); }
@@ -53,55 +32,16 @@ export default function Dashboard({ decks, user, onLogout, onCreateDeck, onSelec
         if (!text) return;
         setIsProcessing(true);
         try {
-            const blocks = text.split('---').map(b => b.trim()).filter(b => b);
-            for (const block of blocks) {
-                const lines = block.split('\n');
-                let currentDeckName = "";
-                const cardsToImport = [];
-                let currentP = "";
-                for (const line of lines) {
-                    const trimmed = line.trim();
-                    if (trimmed.startsWith('Deck:')) currentDeckName = trimmed.replace('Deck:', '').trim();
-                    else if (trimmed.startsWith('P:')) currentP = trimmed.replace('P:', '').trim();
-                    else if (trimmed.startsWith('R:')) {
-                        const currentR = trimmed.replace('R:', '').trim();
-                        if (currentP && currentR) {
-                            cardsToImport.push({ front: currentP, back: currentR });
-                            currentP = "";
-                        }
-                    }
-                }
-
-                if (currentDeckName && cardsToImport.length > 0) {
-                    // Create Deck
-                    // We need to call API directly or use prop. Props update state in App, but we are in a loop.
-                    // Better verify if deck exists? No, always create new as per logic.
-                    // Using api directly for reliability in loop, but we need to update Parent state.
-                    // Calling prop onCreateDeck updates parent state.
-
-                    const newDeckId = await onCreateDeck(currentDeckName);
-
-                    if (newDeckId) {
-                        for (const card of cardsToImport) {
-                            await api.cards.create({
-                                deckId: newDeckId,
-                                front: card.front,
-                                back: card.back,
-                                state: 'NOVO', // Default values handled by API or logic
-                                // API expects: deckId, front, back, mediaType, etc.
-                                // Minimal:
-                                deckId: newDeckId,
-                                front: card.front,
-                                back: card.back
-                            });
-                        }
-                    }
+            for (const deck of parseDecks(text)) {
+                // onCreateDeck also adds the deck to the parent state.
+                const newDeckId = await onCreateDeck(deck.name);
+                if (!newDeckId) continue;
+                for (const card of deck.cards) {
+                    await api.cards.create({ deckId: newDeckId, front: card.front, back: card.back });
                 }
             }
             setImportText('');
             setShowImport(false);
-            // Ideally trigger a reload of decks in App, but onCreateDeck updates the list. 
-            // Cards are only loaded on view, so we are good.
         } catch (err) {
             console.error("Erro na importação:", err);
         } finally {
