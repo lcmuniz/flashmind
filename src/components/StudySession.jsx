@@ -1,24 +1,21 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { ChevronLeft, CheckCircle2, Check } from 'lucide-react';
 import { ANSWERS } from '../lib/constants';
 
-export default function StudySession({ deck, allCards, onBack, onAnswer }) {
-    const [queue, setQueue] = useState([]);
+export default function StudySession({ allCards, onBack, onAnswer }) {
+    // A fila é calculada uma vez ao abrir a sessão: cartões respondidos não voltam nela.
+    const [queue] = useState(() => {
+        const now = new Date();
+        return allCards.filter(c => new Date(c.nextReviewDate) <= now)
+            .sort((a, b) => new Date(a.nextReviewDate) - new Date(b.nextReviewDate));
+    });
+    const total = queue.length;
     const [index, setIndex] = useState(0);
-    const [total, setTotal] = useState(0);
     const [isFlipped, setIsFlipped] = useState(false);
     const [finished, setFinished] = useState(false);
     const [typed, setTyped] = useState('');
     const [trans, setTrans] = useState(false);
     const inputRef = useRef(null);
-
-    useEffect(() => {
-        const now = new Date();
-        const sorted = allCards.filter(c => new Date(c.nextReviewDate) <= now)
-            .sort((a, b) => new Date(a.nextReviewDate) - new Date(b.nextReviewDate));
-        setQueue(sorted);
-        setTotal(sorted.length);
-    }, []);
 
     const card = queue[index];
 
@@ -29,7 +26,7 @@ export default function StudySession({ deck, allCards, onBack, onAnswer }) {
         }
     }, [isFlipped, index, trans, card]);
 
-    const handleAction = async (answer) => {
+    const handleAction = useCallback(async (answer) => {
         if (trans || !card) return;
         setTrans(true);
         await onAnswer(card, answer);
@@ -39,7 +36,7 @@ export default function StudySession({ deck, allCards, onBack, onAnswer }) {
             if (index < queue.length - 1) { setIndex(i => i + 1); setTrans(false); }
             else { setFinished(true); setTrans(false); }
         }, 450);
-    };
+    }, [trans, card, onAnswer, index, queue.length]);
 
     useEffect(() => {
         const keyHandler = (e) => {
@@ -64,7 +61,7 @@ export default function StudySession({ deck, allCards, onBack, onAnswer }) {
         };
         window.addEventListener('keydown', keyHandler);
         return () => window.removeEventListener('keydown', keyHandler);
-    }, [isFlipped, trans, card, onBack]);
+    }, [isFlipped, trans, card, onBack, handleAction]);
 
     const match = useMemo(() => card && typed.trim().toLowerCase() === card.back.trim().toLowerCase(), [typed, card]);
 
