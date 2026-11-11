@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { LEARNING_STEPS, GRADUATION_INTERVAL, EASY_INTERVAL, MIN_EASE_FACTOR, CARD_STATES, ANSWERS } from './lib/constants';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CARD_STATES } from './lib/constants';
 import { api } from './lib/api';
+import { scheduleReview } from './lib/scheduler';
 
 import LoginScreen from './components/LoginScreen';
 import Dashboard from './components/Dashboard';
@@ -16,93 +17,34 @@ export default function App() {
   const [decks, setDecks] = useState([]);
   const [currentDeckId, setCurrentDeckId] = useState(null);
   const [cards, setCards] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const handleLogout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user_data');
+    setUser(null);
+    setView('login');
+  }, []);
+
+  const handleLoadError = useCallback((err) => {
+    console.error(err);
+    if (err.message.includes('auth')) handleLogout();
+  }, [handleLogout]);
 
   // Carregar decks ao entrar no dashboard
   useEffect(() => {
     if (view === 'dashboard' && user) {
-      loadDecks();
+      api.decks.list().then(setDecks).catch(handleLoadError);
     }
-  }, [view, user]);
+  }, [view, user, handleLoadError]);
 
   // Carregar cards ao selecionar deck
   useEffect(() => {
     if (currentDeckId) {
-      loadCards(currentDeckId);
+      api.cards.list(currentDeckId).then(setCards).catch(handleLoadError);
     }
-  }, [currentDeckId]);
-
-  const loadDecks = async () => {
-    try {
-      const data = await api.decks.list();
-      setDecks(data);
-    } catch (err) {
-      console.error(err);
-      if (err.message.includes('auth')) handleLogout();
-    }
-  };
-
-  const loadCards = async (deckId) => {
-    try {
-      const data = await api.cards.list(deckId);
-      setCards(data);
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  }, [currentDeckId, handleLoadError]);
 
   const handleReviewAnswer = async (card, answer) => {
-    let updatedCard = { ...card };
-    const now = new Date();
-
-    if (updatedCard.state === CARD_STATES.NEW || updatedCard.state === 'NEW') {
-      updatedCard.state = CARD_STATES.LEARNING;
-      updatedCard.learningStepIndex = 0;
-      updatedCard.nextReviewDate = new Date(now.getTime() + LEARNING_STEPS[0] * 60000).toISOString();
-    } else if (updatedCard.state === CARD_STATES.LEARNING) {
-      if (answer === ANSWERS.AGAIN) {
-        updatedCard.learningStepIndex = 0;
-        updatedCard.nextReviewDate = new Date(now.getTime() + LEARNING_STEPS[0] * 60000).toISOString();
-      } else if (answer === ANSWERS.EASY) {
-        updatedCard.state = CARD_STATES.REVIEW;
-        updatedCard.interval = EASY_INTERVAL;
-        updatedCard.repetitions = 1;
-        updatedCard.nextReviewDate = new Date(now.getTime() + EASY_INTERVAL * 24 * 60 * 60 * 1000).toISOString();
-      } else {
-        const nextStepIndex = (updatedCard.learningStepIndex || 0) + 1;
-        if (nextStepIndex < LEARNING_STEPS.length) {
-          updatedCard.learningStepIndex = nextStepIndex;
-          updatedCard.nextReviewDate = new Date(now.getTime() + LEARNING_STEPS[nextStepIndex] * 60000).toISOString();
-        } else {
-          updatedCard.state = CARD_STATES.REVIEW;
-          updatedCard.interval = GRADUATION_INTERVAL;
-          updatedCard.repetitions = 1;
-          updatedCard.nextReviewDate = new Date(now.getTime() + GRADUATION_INTERVAL * 24 * 60 * 60 * 1000).toISOString();
-        }
-      }
-    } else if (updatedCard.state === CARD_STATES.REVIEW) {
-      if (answer === ANSWERS.AGAIN) {
-        updatedCard.repetitions = 0;
-        updatedCard.interval = 1;
-        updatedCard.ease_factor = Math.max(MIN_EASE_FACTOR, updatedCard.ease_factor - 0.2);
-        updatedCard.state = CARD_STATES.LEARNING;
-        updatedCard.learningStepIndex = 0;
-        updatedCard.nextReviewDate = new Date(now.getTime() + LEARNING_STEPS[0] * 60000).toISOString();
-      } else {
-        if (answer === ANSWERS.HARD) {
-          updatedCard.ease_factor = Math.max(MIN_EASE_FACTOR, updatedCard.ease_factor - 0.15);
-          updatedCard.interval = Math.max(1, updatedCard.interval * 1.2);
-        } else if (answer === ANSWERS.GOOD) {
-          updatedCard.interval = updatedCard.interval * updatedCard.ease_factor;
-        } else if (answer === ANSWERS.EASY) {
-          updatedCard.ease_factor = updatedCard.ease_factor + 0.15;
-          updatedCard.interval = updatedCard.interval * updatedCard.ease_factor * 1.3;
-        }
-        updatedCard.interval = Math.round(updatedCard.interval);
-        updatedCard.repetitions += 1;
-        updatedCard.nextReviewDate = new Date(now.getTime() + updatedCard.interval * 24 * 60 * 60 * 1000).toISOString();
-      }
-    }
+    const updatedCard = scheduleReview(card, answer);
 
     // Otimista
     setCards(prev => prev.map(c => c.id === card.id ? updatedCard : c));
@@ -146,19 +88,6 @@ export default function App() {
     setView('dashboard');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user_data');
-    setUser(null);
-    setView('login');
-  };
-
-  if (loading) return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-indigo-100 overflow-x-hidden">
       {view === 'login' && <LoginScreen onLogin={handleLogin} />}
@@ -181,7 +110,6 @@ export default function App() {
         <DeckView
           deck={decks.find(d => d.id === currentDeckId)}
           cards={cards}
-          userEmail={user?.email}
           onBack={() => setView('dashboard')}
           onStudy={() => setView('study')}
           onAddCard={(f, b, t, u) => addCardToDeck(currentDeckId, f, b, t, u)}
@@ -190,7 +118,7 @@ export default function App() {
             if (!card) return;
             const updated = { ...card, front: f, back: b, mediaType: t, mediaUrl: u };
             try {
-              await api.cards.update(id, { front: f, back: b, mediaType: t, mediaUrl: u }); // Send only fields to update? API now handles partials via COALESCE
+              await api.cards.update(id, { front: f, back: b, mediaType: t, mediaUrl: u }); // a API aceita atualização parcial
               setCards(prev => prev.map(c => c.id === id ? updated : c));
             } catch (e) { console.error(e); }
           }}

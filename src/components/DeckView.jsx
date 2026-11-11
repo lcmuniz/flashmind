@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, Trash2, Edit2 } from 'lucide-react';
 import { CARD_STATES } from '../lib/constants';
 
-export default function DeckView({ deck, cards, userEmail, onBack, onStudy, onAddCard, onEditCard, onDeleteCard }) {
+export default function DeckView({ deck, cards, onBack, onStudy, onAddCard, onEditCard, onDeleteCard }) {
     const [showAdd, setShowAdd] = useState(false);
     const [showEdit, setShowEdit] = useState(false);
     const [editingCard, setEditingCard] = useState(null);

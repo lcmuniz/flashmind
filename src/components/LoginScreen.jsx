@@ -20,7 +20,7 @@ export default function LoginScreen({ onLogin }) {
             }
             onLogin(data);
         } catch (err) {
-            setError("Falha na autenticação. Verifique suas credenciais.");
+            setError(isRegistering && err.message ? err.message : "Falha na autenticação. Verifique suas credenciais.");
         }
     };
 
@@ -58,6 +58,7 @@ export default function LoginScreen({ onLogin }) {
                             <input
                                 type="password"
                                 required
+                                minLength={isRegistering ? 8 : undefined}
                                 className="w-full bg-slate-50 border-2 border-slate-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:border-indigo-500 focus:bg-white transition-all font-medium"
                                 placeholder="******"
                                 value={password}
